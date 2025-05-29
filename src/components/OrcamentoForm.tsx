@@ -1,4 +1,3 @@
-
 import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -116,24 +115,30 @@ export const OrcamentoForm = ({ orcamento, onSuccess, onCancel }: OrcamentoFormP
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Veículo</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select 
+                  onValueChange={field.onChange} 
+                  value={field.value}
+                  disabled={!selectedClienteId || veiculos.length === 0}
+                >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione o veículo" />
+                      <SelectValue 
+                        placeholder={
+                          !selectedClienteId 
+                            ? "Selecione um cliente primeiro" 
+                            : veiculos.length === 0 
+                            ? "Nenhum veículo cadastrado para este cliente"
+                            : "Selecione o veículo"
+                        } 
+                      />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {veiculos.length > 0 ? (
-                      veiculos.map((veiculo) => (
-                        <SelectItem key={veiculo.id} value={veiculo.id}>
-                          {veiculo.marca} {veiculo.modelo} {veiculo.ano} - {veiculo.placa}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="" disabled>
-                        {selectedClienteId ? "Nenhum veículo cadastrado para este cliente" : "Selecione um cliente primeiro"}
+                    {veiculos.map((veiculo) => (
+                      <SelectItem key={veiculo.id} value={veiculo.id}>
+                        {veiculo.marca} {veiculo.modelo} {veiculo.ano} - {veiculo.placa}
                       </SelectItem>
-                    )}
+                    ))}
                   </SelectContent>
                 </Select>
                 <FormMessage />
