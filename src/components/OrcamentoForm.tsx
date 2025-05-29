@@ -5,7 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Plus } from "lucide-react"
@@ -61,10 +60,13 @@ export const OrcamentoForm = ({ orcamento, onSuccess, onCancel }: OrcamentoFormP
         })
       } else {
         await createOrcamento.mutateAsync({
-          ...data,
+          cliente_id: data.cliente_id,
+          veiculo_id: data.veiculo_id,
+          data_orcamento: data.data_orcamento,
+          validade: data.validade,
           numero: "", // Será gerado pelo trigger da database
           valor_total: 0,
-          status: "Pendente" as any,
+          status: "Pendente",
         })
       }
       onSuccess?.()
@@ -114,18 +116,24 @@ export const OrcamentoForm = ({ orcamento, onSuccess, onCancel }: OrcamentoFormP
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Veículo</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o veículo" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {veiculos.map((veiculo) => (
-                      <SelectItem key={veiculo.id} value={veiculo.id}>
-                        {veiculo.marca} {veiculo.modelo} {veiculo.ano} - {veiculo.placa}
+                    {veiculos.length > 0 ? (
+                      veiculos.map((veiculo) => (
+                        <SelectItem key={veiculo.id} value={veiculo.id}>
+                          {veiculo.marca} {veiculo.modelo} {veiculo.ano} - {veiculo.placa}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="" disabled>
+                        {selectedClienteId ? "Nenhum veículo cadastrado para este cliente" : "Selecione um cliente primeiro"}
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
                 <FormMessage />
