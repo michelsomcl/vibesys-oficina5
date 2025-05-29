@@ -1,3 +1,4 @@
+
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -8,7 +9,6 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import { 
-  FileText, 
   Plus, 
   Search, 
   Pencil, 
@@ -16,57 +16,22 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from "lucide-react"
+import { useOrcamentos, useDeleteOrcamento } from "@/hooks/useOrcamentos"
+import { OrcamentoForm } from "@/components/OrcamentoForm"
+import { format } from "date-fns"
 
 const Orcamentos = () => {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [viewingOrcamento, setViewingOrcamento] = useState<any>(null)
   const [editingOrcamento, setEditingOrcamento] = useState<any>(null)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
 
-  // Dados mock para demonstração
-  const orcamentos = [
-    {
-      id: "ORC-001",
-      cliente: "João Silva",
-      veiculo: "Honda Civic 2020",
-      dataOrcamento: "10/12/2024",
-      validade: "17/12/2024",
-      valor: 1250.00,
-      status: "Pendente",
-      pecas: [
-        { nome: "Pastilha de Freio", quantidade: 1, valor: 150.00 },
-        { nome: "Óleo Motor", quantidade: 2, valor: 80.00 }
-      ],
-      servicos: [
-        { nome: "Troca de Freio", horas: 2, valorHora: 50.00 },
-        { nome: "Troca de Óleo", horas: 1, valorHora: 40.00 }
-      ]
-    },
-    {
-      id: "ORC-002",
-      cliente: "Maria Santos",
-      veiculo: "Toyota Corolla 2019",
-      dataOrcamento: "08/12/2024",
-      validade: "15/12/2024",
-      valor: 850.00,
-      status: "Aprovado",
-      pecas: [{ nome: "Filtro de Ar", quantidade: 1, valor: 45.00 }],
-      servicos: [{ nome: "Revisão Geral", horas: 3, valorHora: 60.00 }]
-    },
-    {
-      id: "ORC-003",
-      cliente: "Carlos Lima",
-      veiculo: "Ford Focus 2018",
-      dataOrcamento: "05/12/2024",
-      validade: "12/12/2024",
-      valor: 650.00,
-      status: "Reprovado",
-      pecas: [{ nome: "Amortecedor", quantidade: 2, valor: 200.00 }],
-      servicos: [{ nome: "Troca Amortecedor", horas: 2, valorHora: 55.00 }]
-    }
-  ]
+  const { data: orcamentos = [], isLoading } = useOrcamentos()
+  const deleteOrcamento = useDeleteOrcamento()
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -99,8 +64,8 @@ const Orcamentos = () => {
   }
 
   const filteredOrcamentos = orcamentos.filter(orcamento => {
-    const matchesSearch = orcamento.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         orcamento.cliente.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = orcamento.numero?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         orcamento.cliente?.nome?.toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesStatus = statusFilter === "all" || orcamento.status === statusFilter
     
@@ -115,6 +80,20 @@ const Orcamentos = () => {
     setEditingOrcamento(orcamento)
   }
 
+  const handleDelete = (id: string) => {
+    if (confirm("Tem certeza que deseja excluir este orçamento?")) {
+      deleteOrcamento.mutate(id)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
@@ -123,7 +102,7 @@ const Orcamentos = () => {
           <p className="text-muted-foreground">Gerencie orçamentos e aprovações</p>
         </div>
         
-        <Dialog>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-primary hover:bg-primary/90">
               <Plus className="w-4 h-4 mr-2" />
@@ -134,7 +113,10 @@ const Orcamentos = () => {
             <DialogHeader>
               <DialogTitle>Criar Novo Orçamento</DialogTitle>
             </DialogHeader>
-            <OrcamentoForm />
+            <OrcamentoForm 
+              onSuccess={() => setIsDialogOpen(false)}
+              onCancel={() => setIsDialogOpen(false)}
+            />
           </DialogContent>
         </Dialog>
       </div>
@@ -178,7 +160,7 @@ const Orcamentos = () => {
               <div className="flex justify-between items-start">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <CardTitle className="text-xl">{orcamento.id}</CardTitle>
+                    <CardTitle className="text-xl">{orcamento.numero}</CardTitle>
                     <Badge className={getStatusColor(orcamento.status)}>
                       <div className="flex items-center gap-1">
                         {getStatusIcon(orcamento.status)}
@@ -187,14 +169,14 @@ const Orcamentos = () => {
                     </Badge>
                   </div>
                   <div className="text-muted-foreground">
-                    <p><strong>Cliente:</strong> {orcamento.cliente}</p>
-                    <p><strong>Veículo:</strong> {orcamento.veiculo}</p>
-                    <p><strong>Data:</strong> {orcamento.dataOrcamento} | <strong>Validade:</strong> {orcamento.validade}</p>
+                    <p><strong>Cliente:</strong> {orcamento.cliente?.nome}</p>
+                    <p><strong>Veículo:</strong> {orcamento.veiculo ? `${orcamento.veiculo.marca} ${orcamento.veiculo.modelo} ${orcamento.veiculo.ano} - ${orcamento.veiculo.placa}` : 'N/A'}</p>
+                    <p><strong>Data:</strong> {format(new Date(orcamento.data_orcamento), 'dd/MM/yyyy')} | <strong>Validade:</strong> {format(new Date(orcamento.validade), 'dd/MM/yyyy')}</p>
                   </div>
                 </div>
                 <div className="text-right space-y-2">
                   <div className="text-2xl font-bold text-primary">
-                    R$ {orcamento.valor.toFixed(2).replace('.', ',')}
+                    R$ {orcamento.valor_total.toFixed(2).replace('.', ',')}
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => handleView(orcamento)}>
@@ -218,12 +200,12 @@ const Orcamentos = () => {
                 <div>
                   <h4 className="font-medium mb-2">Peças</h4>
                   <div className="space-y-1">
-                    {orcamento.pecas.map((peca, index) => (
+                    {orcamento.orcamento_pecas?.map((item, index) => (
                       <div key={index} className="flex justify-between text-sm">
-                        <span>{peca.quantidade}x {peca.nome}</span>
-                        <span>R$ {(peca.quantidade * peca.valor).toFixed(2).replace('.', ',')}</span>
+                        <span>{item.quantidade}x {item.peca?.nome}</span>
+                        <span>R$ {(item.quantidade * parseFloat(item.valor_unitario.toString())).toFixed(2).replace('.', ',')}</span>
                       </div>
-                    ))}
+                    )) || <span className="text-sm text-muted-foreground">Nenhuma peça</span>}
                   </div>
                 </div>
                 
@@ -231,12 +213,12 @@ const Orcamentos = () => {
                 <div>
                   <h4 className="font-medium mb-2">Serviços</h4>
                   <div className="space-y-1">
-                    {orcamento.servicos.map((servico, index) => (
+                    {orcamento.orcamento_servicos?.map((item, index) => (
                       <div key={index} className="flex justify-between text-sm">
-                        <span>{servico.horas}h {servico.nome}</span>
-                        <span>R$ {(servico.horas * servico.valorHora).toFixed(2).replace('.', ',')}</span>
+                        <span>{item.horas}h {item.servico?.nome}</span>
+                        <span>R$ {(parseFloat(item.horas.toString()) * parseFloat(item.valor_hora.toString())).toFixed(2).replace('.', ',')}</span>
                       </div>
-                    ))}
+                    )) || <span className="text-sm text-muted-foreground">Nenhum serviço</span>}
                   </div>
                 </div>
               </div>
@@ -245,30 +227,38 @@ const Orcamentos = () => {
         ))}
       </div>
 
+      {filteredOrcamentos.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Nenhum orçamento encontrado.</p>
+        </div>
+      )}
+
       {/* Dialog para Visualizar Orçamento */}
       <Dialog open={!!viewingOrcamento} onOpenChange={(open) => !open && setViewingOrcamento(null)}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Visualizar Orçamento - {viewingOrcamento?.id}</DialogTitle>
+            <DialogTitle>Visualizar Orçamento - {viewingOrcamento?.numero}</DialogTitle>
           </DialogHeader>
           {viewingOrcamento && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium">Cliente</Label>
-                  <p className="text-sm text-muted-foreground">{viewingOrcamento.cliente}</p>
+                  <p className="text-sm text-muted-foreground">{viewingOrcamento.cliente?.nome}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Veículo</Label>
-                  <p className="text-sm text-muted-foreground">{viewingOrcamento.veiculo}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {viewingOrcamento.veiculo ? `${viewingOrcamento.veiculo.marca} ${viewingOrcamento.veiculo.modelo} ${viewingOrcamento.veiculo.ano} - ${viewingOrcamento.veiculo.placa}` : 'N/A'}
+                  </p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Data do Orçamento</Label>
-                  <p className="text-sm text-muted-foreground">{viewingOrcamento.dataOrcamento}</p>
+                  <p className="text-sm text-muted-foreground">{format(new Date(viewingOrcamento.data_orcamento), 'dd/MM/yyyy')}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Validade</Label>
-                  <p className="text-sm text-muted-foreground">{viewingOrcamento.validade}</p>
+                  <p className="text-sm text-muted-foreground">{format(new Date(viewingOrcamento.validade), 'dd/MM/yyyy')}</p>
                 </div>
               </div>
 
@@ -278,30 +268,30 @@ const Orcamentos = () => {
                 <div>
                   <h3 className="text-lg font-medium mb-4">Peças</h3>
                   <div className="space-y-2">
-                    {viewingOrcamento.pecas.map((peca, index) => (
+                    {viewingOrcamento.orcamento_pecas?.map((item, index) => (
                       <div key={index} className="flex justify-between border-b pb-2">
                         <div>
-                          <p className="font-medium">{peca.nome}</p>
-                          <p className="text-sm text-muted-foreground">Qtd: {peca.quantidade}</p>
+                          <p className="font-medium">{item.peca?.nome}</p>
+                          <p className="text-sm text-muted-foreground">Qtd: {item.quantidade}</p>
                         </div>
-                        <p className="font-medium">R$ {(peca.quantidade * peca.valor).toFixed(2).replace('.', ',')}</p>
+                        <p className="font-medium">R$ {(item.quantidade * parseFloat(item.valor_unitario.toString())).toFixed(2).replace('.', ',')}</p>
                       </div>
-                    ))}
+                    )) || <p className="text-sm text-muted-foreground">Nenhuma peça</p>}
                   </div>
                 </div>
 
                 <div>
                   <h3 className="text-lg font-medium mb-4">Serviços</h3>
                   <div className="space-y-2">
-                    {viewingOrcamento.servicos.map((servico, index) => (
+                    {viewingOrcamento.orcamento_servicos?.map((item, index) => (
                       <div key={index} className="flex justify-between border-b pb-2">
                         <div>
-                          <p className="font-medium">{servico.nome}</p>
-                          <p className="text-sm text-muted-foreground">Horas: {servico.horas}</p>
+                          <p className="font-medium">{item.servico?.nome}</p>
+                          <p className="text-sm text-muted-foreground">Horas: {item.horas}</p>
                         </div>
-                        <p className="font-medium">R$ {(servico.horas * servico.valorHora).toFixed(2).replace('.', ',')}</p>
+                        <p className="font-medium">R$ {(parseFloat(item.horas.toString()) * parseFloat(item.valor_hora.toString())).toFixed(2).replace('.', ',')}</p>
                       </div>
-                    ))}
+                    )) || <p className="text-sm text-muted-foreground">Nenhum serviço</p>}
                   </div>
                 </div>
               </div>
@@ -320,7 +310,7 @@ const Orcamentos = () => {
                 <div className="text-right">
                   <p className="text-sm text-muted-foreground">Valor Total</p>
                   <p className="text-2xl font-bold text-primary">
-                    R$ {viewingOrcamento.valor.toFixed(2).replace('.', ',')}
+                    R$ {viewingOrcamento.valor_total.toFixed(2).replace('.', ',')}
                   </p>
                 </div>
               </div>
@@ -333,114 +323,18 @@ const Orcamentos = () => {
       <Dialog open={!!editingOrcamento} onOpenChange={(open) => !open && setEditingOrcamento(null)}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Editar Orçamento - {editingOrcamento?.id}</DialogTitle>
+            <DialogTitle>Editar Orçamento - {editingOrcamento?.numero}</DialogTitle>
           </DialogHeader>
-          {editingOrcamento && <OrcamentoForm orcamento={editingOrcamento} />}
+          {editingOrcamento && (
+            <OrcamentoForm 
+              orcamento={editingOrcamento} 
+              onSuccess={() => setEditingOrcamento(null)}
+              onCancel={() => setEditingOrcamento(null)}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
-  )
-}
-
-const OrcamentoForm = ({ orcamento }: { orcamento?: any }) => {
-  return (
-    <form className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="cliente">Cliente</Label>
-          <Select defaultValue={orcamento?.cliente}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione o cliente" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="João Silva">João Silva</SelectItem>
-              <SelectItem value="Maria Santos">Maria Santos</SelectItem>
-              <SelectItem value="Carlos Lima">Carlos Lima</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="veiculo">Veículo</Label>
-          <Select defaultValue={orcamento?.veiculo}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione o veículo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Honda Civic 2020">Honda Civic 2020 - ABC-1234</SelectItem>
-              <SelectItem value="Toyota Corolla 2019">Toyota Corolla 2019 - XYZ-5678</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="dataOrcamento">Data do Orçamento</Label>
-          <Input id="dataOrcamento" type="date" defaultValue={orcamento?.dataOrcamento} />
-        </div>
-        <div>
-          <Label htmlFor="validade">Validade</Label>
-          <Input id="validade" type="date" defaultValue={orcamento?.validade} />
-        </div>
-      </div>
-
-      <Separator />
-
-      <div>
-        <h3 className="text-lg font-medium mb-4">Peças</h3>
-        <div className="space-y-3">
-          <div className="grid grid-cols-4 gap-2">
-            <Select>
-              <SelectTrigger>
-                <SelectValue placeholder="Peça" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">Pastilha de Freio</SelectItem>
-                <SelectItem value="2">Óleo Motor</SelectItem>
-                <SelectItem value="3">Filtro de Ar</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input placeholder="Qtd" />
-            <Input placeholder="Valor unit." />
-            <Button variant="outline">
-              <Plus className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <Separator />
-
-      <div>
-        <h3 className="text-lg font-medium mb-4">Serviços</h3>
-        <div className="space-y-3">
-          <div className="grid grid-cols-4 gap-2">
-            <Select>
-              <SelectTrigger>
-                <SelectValue placeholder="Serviço" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">Troca de Freio</SelectItem>
-                <SelectItem value="2">Troca de Óleo</SelectItem>
-                <SelectItem value="3">Revisão Geral</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input placeholder="Horas" />
-            <Input placeholder="Valor/hora" />
-            <Button variant="outline">
-              <Plus className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex justify-end gap-2">
-        <Button variant="outline">Cancelar</Button>
-        <Button className="bg-primary hover:bg-primary/90">
-          {orcamento ? "Atualizar Orçamento" : "Salvar Orçamento"}
-        </Button>
-      </div>
-    </form>
   )
 }
 
