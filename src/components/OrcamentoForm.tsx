@@ -1,4 +1,5 @@
-import { useState } from "react"
+
+import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -8,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { Plus } from "lucide-react"
 import { useClientes } from "@/hooks/useClientes"
-import { useVeiculosByCliente } from "@/hooks/useVeiculos"
 import { usePecas } from "@/hooks/usePecas"
 import { useServicos } from "@/hooks/useServicos"
 import { useCreateOrcamento, useUpdateOrcamento } from "@/hooks/useOrcamentos"
@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 
 const orcamentoSchema = z.object({
   cliente_id: z.string().min(1, "Cliente é obrigatório"),
-  veiculo_id: z.string().min(1, "Veículo é obrigatório"),
+  veiculo_info: z.string().optional(), // Campo para mostrar info do veículo (read-only)
   data_orcamento: z.string().min(1, "Data do orçamento é obrigatória"),
   validade: z.string().min(1, "Validade é obrigatória"),
 })
@@ -31,9 +31,9 @@ interface OrcamentoFormProps {
 
 export const OrcamentoForm = ({ orcamento, onSuccess, onCancel }: OrcamentoFormProps) => {
   const [selectedClienteId, setSelectedClienteId] = useState(orcamento?.cliente_id || "")
+  const [selectedCliente, setSelectedCliente] = useState<any>(null)
   
   const { data: clientes = [] } = useClientes()
-  const { data: veiculos = [] } = useVeiculosByCliente(selectedClienteId)
   const { data: pecas = [] } = usePecas()
   const { data: servicos = [] } = useServicos()
   
@@ -44,23 +44,44 @@ export const OrcamentoForm = ({ orcamento, onSuccess, onCancel }: OrcamentoFormP
     resolver: zodResolver(orcamentoSchema),
     defaultValues: {
       cliente_id: orcamento?.cliente_id || "",
-      veiculo_id: orcamento?.veiculo_id || "",
+      veiculo_info: "",
       data_orcamento: orcamento?.data_orcamento || new Date().toISOString().split('T')[0],
       validade: orcamento?.validade || "",
     },
   })
+
+  // Atualiza as informações do cliente selecionado
+  useEffect(() => {
+    if (selectedClienteId) {
+      const cliente = clientes.find(c => c.id === selectedClienteId)
+      setSelectedCliente(cliente)
+      
+      if (cliente && cliente.marca && cliente.modelo) {
+        const veiculoInfo = `${cliente.marca} ${cliente.modelo} ${cliente.ano} - ${cliente.placa}`
+        form.setValue("veiculo_info", veiculoInfo)
+      } else {
+        form.setValue("veiculo_info", "")
+      }
+    } else {
+      setSelectedCliente(null)
+      form.setValue("veiculo_info", "")
+    }
+  }, [selectedClienteId, clientes, form])
 
   const onSubmit = async (data: OrcamentoFormData) => {
     try {
       if (orcamento) {
         await updateOrcamento.mutateAsync({
           id: orcamento.id,
-          ...data,
+          cliente_id: data.cliente_id,
+          veiculo_id: selectedClienteId, // Usando o mesmo ID do cliente para compatibilidade
+          data_orcamento: data.data_orcamento,
+          validade: data.validade,
         })
       } else {
         await createOrcamento.mutateAsync({
           cliente_id: data.cliente_id,
-          veiculo_id: data.veiculo_id,
+          veiculo_id: selectedClienteId, // Usando o mesmo ID do cliente para compatibilidade
           data_orcamento: data.data_orcamento,
           validade: data.validade,
           numero: "", // Será gerado pelo trigger da database
@@ -77,8 +98,9 @@ export const OrcamentoForm = ({ orcamento, onSuccess, onCancel }: OrcamentoFormP
   const handleClienteChange = (clienteId: string) => {
     setSelectedClienteId(clienteId)
     form.setValue("cliente_id", clienteId)
-    form.setValue("veiculo_id", "") // Reset veículo quando cliente muda
   }
+
+  const hasVeiculoInfo = selectedCliente && selectedCliente.marca && selectedCliente.modelo
 
   return (
     <Form {...form}>
@@ -111,36 +133,25 @@ export const OrcamentoForm = ({ orcamento, onSuccess, onCancel }: OrcamentoFormP
           
           <FormField
             control={form.control}
-            name="veiculo_id"
+            name="veiculo_info"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Veículo</FormLabel>
-                <Select 
-                  onValueChange={field.onChange} 
-                  value={field.value}
-                  disabled={!selectedClienteId || veiculos.length === 0}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue 
-                        placeholder={
-                          !selectedClienteId 
-                            ? "Selecione um cliente primeiro" 
-                            : veiculos.length === 0 
-                            ? "Nenhum veículo cadastrado para este cliente"
-                            : "Selecione o veículo"
-                        } 
-                      />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {veiculos.map((veiculo) => (
-                      <SelectItem key={veiculo.id} value={veiculo.id}>
-                        {veiculo.marca} {veiculo.modelo} {veiculo.ano} - {veiculo.placa}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FormControl>
+                  <Input 
+                    {...field} 
+                    value={
+                      !selectedClienteId 
+                        ? "Selecione um cliente primeiro"
+                        : !hasVeiculoInfo
+                        ? "Nenhum veículo cadastrado para este cliente"
+                        : field.value
+                    }
+                    readOnly
+                    className="bg-gray-50"
+                    placeholder="Informações do veículo aparecerão aqui"
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
